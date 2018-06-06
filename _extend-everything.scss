@@ -1,0 +1,79 @@
+@charset "UTF-8";
+// ========================================
+// Extend Everything
+//
+// A mixin that let's you create an @extend
+// right in your CSS selectors. The @extend
+// is automaticly created and all selectors
+// using the same property/value will be
+// added to the @extend.
+//
+// @example:
+// 		@include extend-property("property", value);
+// ========================================
+
+$placeholder-selectors: ();
+$special-character-map: (
+	" ": "-", 
+	",": "",
+	"/": "",
+	".": "",
+	"\"": "",
+	"'": "",
+	"(": "",
+	")": "",
+	"url": "",
+	"#": ""
+);
+
+@function iterate-replace($string, $search, $replace) {
+	$is-indexed: str-index($string, $search);
+	@if $is-indexed {
+		$sliced: str-slice($string, 1, $is-indexed - 1);
+		$replaced: str-replace(str-slice($string, $is-indexed + str-length($search)), $search, $replace);
+		@return $sliced + $replace + $replaced;
+	}
+	@return $string;
+}
+
+@function str-replace($string, $search, $replace: "") {
+	@return iterate-replace($string, $search, $replace);
+}
+
+@function map-str-replace($string, $search) {
+	@each $index, $value in $search {
+		$string: iterate-replace($string, $index, $value);
+	}
+	@return $string;
+}
+
+@function strip-units($value) {
+	@if type-of($value) == "number" {
+		@return ($value / ($value * 0 + 1));
+	}
+	@return $value;
+}
+
+@function set-name($value) {
+	$name: null;
+	@each $i in $value {
+		$i: strip-units($i);
+		$name: append($name, $i, space);
+	}
+	@return map-str-replace(str-replace(quote($name), "null ", ""), $special-character-map);
+}
+
+@mixin extend-property($type: "padding", $value...) {
+	$selector: map-get($placeholder-selectors, $type);
+	$name: map-str-replace(inspect(#{$type}-#{set-name($value)}), $special-character-map);
+	@if $selector == null {
+		$map-key: map-has-key($placeholder-selectors, $name);
+		@if $map-key == false {
+			$placeholder-selectors: map-merge($placeholder-selectors, ($name: quote(nth($value, 1)))) !global;
+			@at-root %#{$name} {
+				#{$type}: $value;
+			}
+		}
+	}
+	@extend %#{$name};
+}
